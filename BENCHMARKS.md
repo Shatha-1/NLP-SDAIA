@@ -21,6 +21,25 @@ Notes:
 - Golden preprocessing: 25 / 25 passed
 - PII masking recall: 60 / 60 = 100%
 
+## Lab 2 — Transformer anatomy
+- `attention()` vs `F.scaled_dot_product_attention`: match at atol=1e-6 → **True**
+- Attention weight matrix rows sum to 1 (valid softmax distribution): **True**
+- `MultiHeadAttention` shape check (batch=2, seq=5, d_model=16, heads=4): input `(2, 5, 16)` → output `(2, 5, 16)` → **passed**
+- Causal mask → attention matrix lower-triangular: **True** (decoder-style / GPT-family attention)
+
+| Checkpoint | Total params | Embeddings % | Attention % | FFN % | Vocab size |
+|---|---:|---:|---:|---:|---:|
+| mBERT | 177,853,440 | 51.8% | 15.9% | 31.9% | 119,547 |
+| CAMeLBERT | 109,081,344 | 21.5% | 26.0% | 52.0% | 30,000 |
+
+**Pad-leak diagnosis** (mBERT, last layer, mean attention mass on `[PAD]` positions):
+| Run | Mean attention mass on [PAD] |
+|---|---:|
+| WITH `attention_mask` | 0.00000 |
+| WITHOUT `attention_mask` | 0.02694 |
+
+Skipping `attention_mask` leaks ~2.7% of attention weight onto `[PAD]` tokens — silent quality degradation, no crash. See `NOTES.md` for the full head-by-head [CLS]/[SEP] sink breakdown.
+
 ## Lab 3 — Models
 | Model | Metric | Validation | Frozen test | Train time |
 |---|---|---:|---:|---:|

@@ -55,10 +55,25 @@ The 5 longest examples in `bayan_raw_sample.csv` (FB-000079, FB-000001, FB-00001
 - Duplicate-word feedback ("My My Licence licence request has been under review for 15 days") is preserved as one sentence and the duplicate words are not merged — consistent with the Lab 1 decision to treat repeated *words* as signal, unlike repeated *characters* within a word.
 
 ## Lab 2 — Parameter audit
-| Checkpoint | Total params | Embeddings % | Other notes |
-|---|---:|---:|---|
-| mBERT | | | |
-| CAMeLBERT | | | |
+Measured via `python scripts/parameter_audit.py`.
+
+| Checkpoint | Total params | Embeddings % | Attention % | FFN % | Other notes |
+|---|---:|---:|---:|---:|---|
+| mBERT | 177,853,440 | 51.8% | 15.9% | 31.9% | vocab_size = 119,547 |
+| CAMeLBERT | 109,081,344 | 21.5% | 26.0% | 52.0% | vocab_size = 30,000 |
+
+**Why is the embedding share different?** Embedding params scale directly with `vocab_size × hidden_size`; mBERT's vocabulary (119,547 subwords, covering ~100+ languages) is ~4x larger than CAMeLBERT's Arabic-focused vocabulary (30,000 subwords), so mBERT pays a much bigger "multilingual tax" — over half its parameters just store the embedding table, leaving proportionally less capacity for the actual transformer layers (attention+FFN), even though both share the identical 12-layer/768-hidden encoder architecture.
+
+## Lab 2 — Causal mask
+Verified in `notebooks/02_transformer_anatomy.py`: with a lower-triangular mask, the resulting attention weight matrix is confirmed lower-triangular (`torch.allclose(w, torch.tril(w))` → True). This is **decoder-style causal (autoregressive) attention**, the pattern used in GPT-family models where position *i* may only attend to positions ≤ *i*.
+
+## Lab 2 — Attention-map diagnostics + pad leak
+Real Bayan example tokenized with mBERT: `['[CLS]', 'ال', '##ح', '##اوية', ..., '[SEP]']` (16 real tokens + padding to match batch).
+
+- **[CLS] "sink" heads**: heads 7 and 8 (last layer) put unusually high weight on `[CLS]` attending to itself (0.480, 0.542) — a common pattern where a head effectively "parks" on a fixed anchor token rather than aggregating new information.
+- **[SEP] sink**: not a uniform pattern across all heads (mean [CLS]→[SEP] weight = 0.176, below a 0.3 threshold), but two individual heads (4 and 11) show a stronger pull toward `[SEP]` (0.220, 0.336) — so the "attention sink" behaviour documented in the literature shows up head-by-head here, not as a whole-layer effect. Do not eyeball a single head and generalise to "the model" — check the full head-by-head table.
+- **Adjacency-looking head**: head 6 puts its top [CLS] weight on `ال` — the token immediately following [CLS] (position 1) — consistent with a local/adjacent-token attention pattern.
+- **Pad-leak diagnosis (the planted bug)**: running the same batch through mBERT *with* `attention_mask` gives **0.00000** mean attention mass on `[PAD]` positions (correctly zeroed by the mask). Running it *without* `attention_mask` gives **0.02694** — real tokens leak ~2.7% of their attention budget onto meaningless `[PAD]` positions. This directly explains why Lab 7's serving path must always pass `attention_mask`: skipping it doesn't crash anything, it just silently degrades every prediction on a padded batch.
 
 ## Lab 4 — Dialect audit
 - Distribution:
