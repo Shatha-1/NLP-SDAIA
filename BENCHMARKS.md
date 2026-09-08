@@ -43,10 +43,16 @@ Skipping `attention_mask` leaks ~2.7% of attention weight onto `[PAD]` tokens �
 ## Lab 3 — Models
 | Model | Metric | Validation | Frozen test | Train time |
 |---|---|---:|---:|---:|
-| TF-IDF + LinearSVC | macro-F1 | | | |
-| Topic classifier | macro-F1 | | | |
-| NER | entity-F1 | | | |
-| QA | span/null smoke | | | |
+| TF-IDF + LinearSVC | macro-F1 | 1.0000 | 1.0000 | ~1s |
+| Topic classifier (XLM-R, 1 epoch) | macro-F1 | 1.0000 | 0.7993 | 4563.1s (~76 min, CPU) |
+| NER (XLM-R, 1 epoch) | entity-F1 | 1.0000 | 1.0000 | 635.6s (~10.6 min, CPU) |
+| QA (deepset/roberta-base-squad2, zero-shot) | span/null smoke | 9/9 answerable, 3/3 null | n/a (frozen at 12/12) | n/a (no training) |
+
+**NER note:** all 4 entity types (DATE, LOCATION, REFERENCE, SERVICE) hit perfect precision/recall/F1 on the frozen test split — comfortably above the ≥0.80 target. This dataset's entities follow a small number of fixed sentence templates (e.g. "بلاغ عن X في Y بتاريخ Z مرجعه W"), which makes span boundaries very regular and easy for the model to learn; ORGANISATION does not appear in `bayan_ner.conll` at all (only DATE/LOCATION/REFERENCE/SERVICE + O are present in the data), so it isn't in this evaluation.
+
+**Note on the topic classifier val/test gap:** validation macro-F1 hit a perfect 1.0000 (final training loss 0.017) but frozen test macro-F1 was only 0.7993 — a real, measured 20-point gap, not a copy-paste error. Working theory: with only 3,820 unique underlying texts recycled across the 12,000-row dataset, many validation sentences are near-duplicates of training sentences (same template, different citizen/date), so the model could partly memorize its way to a perfect validation score after just one epoch. The frozen test split apparently contains a somewhat harder/less-duplicated mix that one epoch wasn't enough to generalise to, whereas TF-IDF's much simpler keyword-based decision boundary generalised to both splits equally. This is reported as measured, not smoothed over — a case study for Lab 6's "don't approve by eyeballing a single split" principle.
+
+**Note on the TF-IDF baseline:** `bayan_feedback.csv` only has 3,820 unique underlying texts spread across 12,000 rows (repeated templates across different citizens/dates), and each `topic` uses very distinct, non-overlapping vocabulary (e.g. "water leak" only ever appears for `water`, "ترخيص" only for `licensing`). That makes topic classification trivial from bag-of-words alone — the baseline reaches a perfect 1.0000 macro-F1 on both validation and the frozen test split, well above the course's "~0.71" reference (which was measured on the real, messier course corpus, not this synthetic reconstruction). This is a real, honest measurement, not a bug — but it also means the transformer classifier has no headroom to clear "+0.08 over baseline"; the achievable target here is to *match* 1.0 while demonstrating the fine-tuning pipeline works, not to beat an already-perfect baseline.
 
 ## Lab 4 — Arabic model bake-off
 | Checkpoint | macro-F1 all | Gulf | MSA | AR fertility |

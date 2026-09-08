@@ -75,6 +75,22 @@ Real Bayan example tokenized with mBERT: `['[CLS]', 'ال', '##ح', '##اوية'
 - **Adjacency-looking head**: head 6 puts its top [CLS] weight on `ال` — the token immediately following [CLS] (position 1) — consistent with a local/adjacent-token attention pattern.
 - **Pad-leak diagnosis (the planted bug)**: running the same batch through mBERT *with* `attention_mask` gives **0.00000** mean attention mass on `[PAD]` positions (correctly zeroed by the mask). Running it *without* `attention_mask` gives **0.02694** — real tokens leak ~2.7% of their attention budget onto meaningless `[PAD]` positions. This directly explains why Lab 7's serving path must always pass `attention_mask`: skipping it doesn't crash anything, it just silently degrades every prediction on a padded batch.
 
+## Lab 3A — Grouped split
+`build_topic_dataset()` loads `data/raw/bayan_feedback.csv` and partitions by its existing `split` column rather than re-shuffling with a fresh grouped split. `data/DATA_DICTIONARY.md` states the supplied split is "70/20/10 and deterministic. The final test split is frozen" and already has 0 `citizen_group_id` overlap across train/validation/test (verified directly) — rebuilding it would risk breaking that frozen contract, so this loads and filters instead of re-grouping.
+
+## Lab 3A — TF-IDF baseline vs fine-tuned classifier
+The TF-IDF + LinearSVC baseline scored a perfect **1.0000 macro-F1** on both validation and the frozen test split — see the note under `BENCHMARKS.md`'s Lab 3 table (the dataset only has 3,820 unique underlying texts recycled across 12,000 rows, each topic with near-exclusive vocabulary, so bag-of-words alone solves it).
+
+The fine-tuned XLM-R classifier (1 epoch, CPU) matched validation (1.0000) but scored **0.7993** on the frozen test split — a real 20-point val/test gap, most likely because near-duplicate template sentences let the model partly memorize its way to a perfect validation score after only one epoch, while the frozen test split's mix generalised less well from that single pass. Documented as measured evidence, not smoothed over — see `BENCHMARKS.md` for the full explanation. A follow-up worth trying (not required by the lab target): more epochs or a lower learning rate to see whether the gap closes, and de-duplicating near-identical templates across splits.
+
+## Lab 3B — NER training
+Trained XLM-R token classification on `data/models/bayan_ner.conll` (4,000 sentences, 80/10/10 split by sentence, 1 epoch). Reached a perfect **1.0000 entity-F1** on validation and frozen test for all 4 present entity types (DATE, LOCATION, REFERENCE, SERVICE) — comfortably clears the ≥0.80 target. `ORGANISATION` (listed in `DATA_DICTIONARY.md`'s NER schema) does not actually appear anywhere in `bayan_ner.conll` (verified: only `O`, `B-DATE`, `B-LOCATION`, `B-REFERENCE`, `B-SERVICE` exist in the file), and there are no `I-` continuation tags either — every entity in this dataset is a single BIO-tagged "word" chunk (which may itself contain an internal space, e.g. `"خدمات المياه"` tagged as one `B-SERVICE` unit). Verified that `is_split_into_words=True` correctly assigns the same `word_id` to both subword pieces of such a multi-space chunk before relying on it for training.
+
+## Lab 3B — QA smoke set
+**Data quirk found**: the supplied `data/eval/qa_smoke_set.json` (12 questions) has `is_impossible=false` for all 12 rows — it cannot supply the "3 unanswerable" half of the lab's 9/3 target on its own, and its 12 rows are really just 3 unique questions about "Service 01" repeated 4x each (not diverse). The actual unanswerable examples exist in the larger training fixture `data/models/bayan_qa.json` (600 QAs total, 100 `is_impossible=true`). `scripts/qa_smoke.py` therefore builds its own 12-question smoke set directly from `bayan_qa.json` — 9 unique answerable questions (3 each from Service 01/02/03) + 3 unique unanswerable questions — instead of trusting the incomplete supplied fixture.
+
+Lab 3B has no QA fine-tuning script (unlike the classifier and NER labs), so `best_span()` is exercised **zero-shot** against `deepset/roberta-base-squad2`, an off-the-shelf SQuAD2 checkpoint already trained with null-answer support. Result: **9/9 answerable → correct span, 3/3 unanswerable → answer=None**, meeting the lab's target with no Bayan-specific training at all — a reasonable outcome since SQuAD2 pretraining already covers exactly this "extract span or abstain" skill on English text.
+
 ## Lab 4 — Dialect audit
 - Distribution:
 - One-sentence implication for MSA-only evaluation:
