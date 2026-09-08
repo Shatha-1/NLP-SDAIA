@@ -12,7 +12,10 @@ from that file instead: 9 unique answerable questions + 3 unique unanswerable
 questions, deterministically selected.
 """
 import json
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 import torch
 from transformers import AutoModelForQuestionAnswering, AutoTokenizer

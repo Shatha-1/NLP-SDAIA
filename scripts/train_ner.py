@@ -2,8 +2,11 @@
 import argparse
 import json
 import random
+import sys
 import time
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 import torch
 from seqeval.metrics import classification_report as seqeval_report

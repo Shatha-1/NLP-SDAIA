@@ -1,8 +1,11 @@
 """Lab 3A starter: fine-tune the Bayan topic classifier."""
 import argparse
 import json
+import sys
 import time
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 import torch
 from sklearn.metrics import f1_score

@@ -1,4 +1,9 @@
 """Lab 3A starter: TF-IDF + LinearSVC baseline."""
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import classification_report, f1_score
 from sklearn.svm import LinearSVC
