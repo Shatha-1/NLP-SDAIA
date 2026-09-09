@@ -18,7 +18,7 @@ from bayan.preprocessing.core import preprocess
 CHECKPOINT = "xlm-roberta-base"  # Lab 1 tokenizer/checkpoint decision
 MAX_LENGTH = 64
 BATCH_SIZE = 32
-EPOCHS = 1
+EPOCHS = 3
 LEARNING_RATE = 2e-5
 
 
