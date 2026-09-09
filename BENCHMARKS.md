@@ -57,6 +57,14 @@ Skipping `attention_mask` leaks ~2.7% of attention weight onto `[PAD]` tokens �
 
 **Note on the TF-IDF baseline:** `bayan_feedback.csv` only has 3,820 unique underlying texts spread across 12,000 rows (repeated templates across different citizens/dates), and each `topic` uses very distinct, non-overlapping vocabulary (e.g. "water leak" only ever appears for `water`, "ترخيص" only for `licensing`). That makes topic classification trivial from bag-of-words alone — the baseline reaches a perfect 1.0000 macro-F1 on both validation and the frozen test split, well above the course's "~0.71" reference (which was measured on the real, messier course corpus, not this synthetic reconstruction). This is a real, honest measurement, not a bug — but it also means the transformer classifier has no headroom to clear "+0.08 over baseline"; the achievable target here is to *match* 1.0 while demonstrating the fine-tuning pipeline works, not to beat an already-perfect baseline.
 
+## Lab 4 — Clitic segmentation + NER LOCATION recall
+| Run | Data | entity-F1 (test) | LOCATION recall (test) |
+|---|---|---:|---:|
+| Day-2 baseline | `bayan_ner.conll` | 1.0000 | 1.0000 |
+| + segmentation | `bayan_ner_segmented.conll` | 1.0000 | 1.0000 |
+
+**LOCATION recall delta: 0.00 points**, not the target +4. This isn't a bug — the Day-2 NER baseline was already a perfect 1.0000 on every entity type (see Lab 3B), so there is no headroom left for segmentation to improve on; recall is capped at 1.0 either way. The supplied `bayan_ner_segmented.conll` also never actually touches LOCATION-tagged tokens (verified: 0/4,000 sentences have a different LOCATION line between the two files) — the only word it clitic-splits is the non-entity `"مرجعه"` → `"مرجع"` + `"ه"`. So even setting the ceiling effect aside, this specific dataset's LOCATION entities never had an attached-clitic problem for segmentation to fix. Same pattern as the Lab 3A baseline ceiling: the synthetic data is easy enough that several targets calibrated for the real, messier course corpus aren't measurable here.
+
 ## Lab 4 — Arabic model bake-off
 | Checkpoint | macro-F1 all | Gulf | MSA | AR fertility |
 |---|---:|---:|---:|---:|

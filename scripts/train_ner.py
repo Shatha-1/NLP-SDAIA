@@ -85,6 +85,11 @@ def parse_args():
         default="artifacts/ner",
         help="Where to save the trained NER artefact (local path or mounted Drive path).",
     )
+    parser.add_argument(
+        "--data",
+        default=str(DATA_PATH),
+        help="CoNLL file to train/evaluate on (e.g. the Lab 4 clitic-segmented variant).",
+    )
     return parser.parse_args()
 
 
@@ -114,7 +119,7 @@ def main():
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    sentences = read_conll(DATA_PATH)
+    sentences = read_conll(Path(args.data))
     train_sents, val_sents, test_sents = split_sentences(sentences)
 
     tag_set = sorted({tag for sent in sentences for tag in sent["tags"]})

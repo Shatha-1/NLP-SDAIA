@@ -93,6 +93,18 @@ Trained XLM-R token classification on `data/models/bayan_ner.conll` (4,000 sente
 
 Lab 3B has no QA fine-tuning script (unlike the classifier and NER labs), so `best_span()` is exercised **zero-shot** against `deepset/roberta-base-squad2`, an off-the-shelf SQuAD2 checkpoint already trained with null-answer support. Result: **9/9 answerable → correct span, 3/3 unanswerable → answer=None**, meeting the lab's target with no Bayan-specific training at all — a reasonable outcome since SQuAD2 pretraining already covers exactly this "extract span or abstain" skill on English text.
 
+## Lab 4 — Arabic normalisation (golden contract)
+`normalize_arabic()` always applies: NFKC, tatweel removal, hamza-on-alef → bare alef (آ/أ/إ/ٱ → ا), alef maksura → yeh (ى → ي), teh marbuta → heh (ة → ه), hamza-on-waw/yeh → bare waw/yeh. Diacritics are stripped only when `profile.dediacritize=True`, so an untested "display" profile (`dediacritize=False`) can keep them for showing raw text to users while a "model" profile gets the fully flattened form. 30/30 golden pairs pass.
+
+**Data quirk**: `data/eval/arabic_normalize_golden.csv` only contains one profile name (`bayan_ar_v1`, repeated 3x per pair = 30 rows from 10 unique pairs) — the "two course profiles" the README describes aren't both represented in the fixture, similar to the Lab 1 raw-sample and Lab 3B smoke-set quirks. The dediacritize=False path is implemented per the course description but isn't exercised by any golden test.
+
+## Lab 4 — Clitic segmentation
+`segment()` uses CAMeL Tools' MLE disambiguator D3 scheme (`d3seg`), splitting both proclitics (e.g. `ال+`) and enclitics (e.g. `+ه`) off their stems, with dediacritization per piece. Verified `"مرجعه"` → `["مرجع", "ه"]`, matching the course-supplied `bayan_ner_segmented.conll` reference exactly for that word. Added a fallback for CAMeL Tools' `"NOAN"` (no-analysis) marker — informal/colloquial words like `"لووووسمحت"` aren't in the MSA morphology DB and returned the literal string `"NOAN"` before the fix; now they fall back to the raw word unchanged.
+
+**Data quirk found**: my D3-based `segment()` is *more* fine-grained than the course-supplied `bayan_ner_segmented.conll` — it also splits the definite article `ال+` off nouns (e.g. `"الدمام"` → `["ال", "دمام"]`), while the reference file leaves `"الدمام"` and `"خدمات المياه"` completely unsplit and only splits the enclitic pronoun in `"مرجعه"` → `"مرجع"`+`"ه"`. Since re-deriving my own split would also require re-deriving new BIO alignments (the reference file's tags are already aligned to its own lighter split), the NER re-training/recall comparison below uses the **course-supplied `bayan_ner_segmented.conll` directly** rather than regenerating it from `segment()` — `segment()` itself is implemented, tested, and correct as a standalone CAMeL Tools D3 utility, it's just a different (more aggressive) scheme than the specific fixture the recall-delta comparison was built against.
+
 ## Lab 4 — Dialect audit
-- Distribution:
-- One-sentence implication for MSA-only evaluation:
+Measured via `python scripts/dialect_audit.py` on `data/raw/bayan_feedback.csv`.
+
+- **Distribution** (Arabic rows only, n=7,200): Gulf 4,800 (66.7%), MSA 2,400 (33.3%). (English rows: `dialect_region="NA"`, not applicable.)
+- **One-sentence implication for MSA-only evaluation**: two-thirds of real Arabic feedback is Gulf dialect, so evaluating (or fine-tuning) only on MSA text would silently miss quality problems for the majority of actual Arabic traffic.
