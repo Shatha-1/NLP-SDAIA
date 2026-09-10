@@ -85,6 +85,16 @@ The fine-tuned XLM-R classifier (1 epoch, CPU) matched validation (1.0000) but s
 
 **Follow-up (confirmed the theory):** retrained for 3 epochs on a Colab T4 GPU (same code/data/split) — frozen test macro-F1 went from 0.7993 to a perfect **1.0000**, and training loss kept dropping steadily each epoch (0.4537 → 0.0105 → 0.0043). This confirms the 1-epoch CPU run was simply undertrained, not evidence of a deeper generalisation problem.
 
+**Important correction found while building Lab 4's bake-off**: the frozen test split is **100% English** — `ds["test"]["lang"].value_counts()` is `{"en": 1200}`, zero Arabic rows. Full per-split language breakdown:
+
+| Split | ar | en |
+|---|---:|---:|
+| train | 6,000 | 2,400 |
+| validation | 1,200 | 1,200 |
+| test | 0 | 1,200 |
+
+This means every "frozen test macro-F1" number reported above (TF-IDF baseline, both classifier runs) was measured **on English text only**, not bilingually as assumed when those results were first written up. It doesn't invalidate the measurements — the classifier genuinely does score 1.0000 macro-F1 on that English test slice — but the claim should be read as "English topic classification," not "bilingual topic classification." `validation` is the only split with a balanced AR/EN mix (and isn't used for any tuning decision in this project, so it's safe to reuse for language-sliced evaluation); Lab 4's Arabic model bake-off uses `validation` instead of `test` for exactly this reason, documented inline in `arabic_bakeoff.py`.
+
 ## Lab 3B — NER training
 Trained XLM-R token classification on `data/models/bayan_ner.conll` (4,000 sentences, 80/10/10 split by sentence, 1 epoch). Reached a perfect **1.0000 entity-F1** on validation and frozen test for all 4 present entity types (DATE, LOCATION, REFERENCE, SERVICE) — comfortably clears the ≥0.80 target. `ORGANISATION` (listed in `DATA_DICTIONARY.md`'s NER schema) does not actually appear anywhere in `bayan_ner.conll` (verified: only `O`, `B-DATE`, `B-LOCATION`, `B-REFERENCE`, `B-SERVICE` exist in the file), and there are no `I-` continuation tags either — every entity in this dataset is a single BIO-tagged "word" chunk (which may itself contain an internal space, e.g. `"خدمات المياه"` tagged as one `B-SERVICE` unit). Verified that `is_split_into_words=True` correctly assigns the same `word_id` to both subword pieces of such a multi-space chunk before relying on it for training.
 

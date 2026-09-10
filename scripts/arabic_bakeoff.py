@@ -24,7 +24,7 @@ CANDIDATES = {
 }
 MAX_LENGTH = 64
 BATCH_SIZE = 32
-EPOCHS = 2
+EPOCHS = 1
 LEARNING_RATE = 2e-5
 
 
@@ -112,7 +112,11 @@ def main():
     label2id = {label: i for i, label in enumerate(label_names)}
 
     ar_train = ds["train"][ds["train"]["lang"] == "ar"]
-    ar_test = ds["test"][ds["test"]["lang"] == "ar"]
+    # The frozen test split is 100% English (0 Arabic rows) in this dataset --
+    # verified: ds["test"]["lang"].value_counts() == {"en": 1200}. Validation
+    # is balanced (1200 ar / 1200 en) and unused for any tuning decision here,
+    # so it's the only split that can actually answer an all/Gulf/MSA question.
+    ar_test = ds["validation"][ds["validation"]["lang"] == "ar"]
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     results = {}
