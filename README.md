@@ -7,6 +7,28 @@
 
 ---
 
+## 👤 Author
+
+**Shatha Hamad Bin Mana**
+[SDAIA Academy](https://github.com/SDAIAAcademy)
+
+## ✅ Progress
+
+| Lab | Status |
+|---|---|
+| Lab 1 — Bilingual Preprocessing & Tokenisation | ✅ Complete |
+| Lab 2 — Transformer Attention | ✅ Complete |
+| Lab 3 — Topic Classification, NER, Extractive QA | ✅ Complete |
+| Lab 4 — Arabic Pipeline & Dialect-Aware Fine-tuning | 🚧 In progress |
+| Lab 5 — Bilingual Semantic Search | ⬜ Not started |
+| Lab 6 — Evaluation Report | ⬜ Not started |
+| Lab 7 — Optimisation & Serving | ⬜ Not started |
+| Capstone | ⬜ Not started |
+
+Measured evidence for completed labs is in [`BENCHMARKS.md`](BENCHMARKS.md), engineering notes in [`NOTES.md`](NOTES.md), and evidence-backed decisions in [`DECISIONS.md`](DECISIONS.md).
+
+---
+
 # 🚀 What are we building?
 
 **Bayan (بيان)** is a bilingual citizen-feedback intelligence service for Arabic and English text.
