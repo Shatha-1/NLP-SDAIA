@@ -68,11 +68,17 @@ Skipping `attention_mask` leaks ~2.7% of attention weight onto `[PAD]` tokens �
 **LOCATION recall delta: 0.00 points**, not the target +4. This isn't a bug — the Day-2 NER baseline was already a perfect 1.0000 on every entity type (see Lab 3B), so there is no headroom left for segmentation to improve on; recall is capped at 1.0 either way. The supplied `bayan_ner_segmented.conll` also never actually touches LOCATION-tagged tokens (verified: 0/4,000 sentences have a different LOCATION line between the two files) — the only word it clitic-splits is the non-entity `"مرجعه"` → `"مرجع"` + `"ه"`. So even setting the ceiling effect aside, this specific dataset's LOCATION entities never had an attached-clitic problem for segmentation to fix. Same pattern as the Lab 3A baseline ceiling: the synthetic data is easy enough that several targets calibrated for the real, messier course corpus aren't measurable here.
 
 ## Lab 4 — Arabic model bake-off
-| Checkpoint | macro-F1 all | Gulf | MSA | AR fertility |
-|---|---:|---:|---:|---:|
-| multilingual incumbent | | | | |
-| Arabic dialect-aware | | | | |
-| optional third model | | | | |
+Measured via `python scripts/arabic_bakeoff.py` on a Colab T4 GPU. Eval set: 2,161 rows — 1,200 MSA (validation split) + 961 Gulf (citizen-grouped 20% holdout carved out of `train`, since `validation` has 0 Gulf rows — see `NOTES.md`).
+
+| Checkpoint | macro-F1 all | Gulf | MSA | AR fertility | Train time |
+|---|---:|---:|---:|---:|---:|
+| multilingual incumbent (XLM-R) | 1.0000 | 1.0000* | 1.0000 | 1.589 | n/a (reused Lab 3A artefact) |
+| CAMeLBERT-mix | 1.0000 | 1.0000 | 1.0000 | 1.305 | 49.0s |
+| CAMeLBERT-DA | 1.0000 | 1.0000 | 1.0000 | 1.305 | 53.7s |
+
+\* In-sample/optimistic: the XLM-R incumbent was already fine-tuned on all Gulf rows in Lab 3A, including the ones held out here for the candidates. Not a fair apples-to-apples Gulf comparison for that one cell — see `NOTES.md`.
+
+**Gulf-slice delta vs incumbent: CAMeLBERT-mix +0.00, CAMeLBERT-DA +0.00** macro-F1 points — not the target +4. Same ceiling effect as every other Lab 3/4 classification result on this synthetic corpus: topic vocabulary is trivial enough that all three checkpoints saturate at a perfect 1.0000 regardless of dialect or pretraining. The measurable, non-tied signal here is **AR fertility**: both CAMeLBERT variants tokenize Arabic more efficiently (1.305) than the multilingual XLM-R incumbent (1.589), i.e. shorter, cheaper sequences for the same text — see `DECISIONS.md#arabic-model` for how that (plus Bayan's known dialect mix) breaks the tie between CAMeLBERT-mix and CAMeLBERT-DA.
 
 ## Lab 5 — Search
 | Configuration | recall@10 | MRR@10 | p50 latency/query |
