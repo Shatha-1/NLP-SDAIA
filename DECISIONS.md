@@ -20,11 +20,11 @@
 - False-positive / false-negative trade-off: because the sweep showed no trade-off inside the tested range (no threshold there caused an on-topic answer to be wrongly suppressed, nor a no-answer query to be wrongly served), the practical choice was to pick a value with headroom on both sides (0.10, roughly midway between the observed no-answer-query scores and the observed answerable-query scores) rather than sit right at either boundary of the tested range.
 
 ## quantisation-split
-- Topic artefact:
-- NER artefact:
-- Latency evidence:
-- Paired quality-tax evidence:
-- Rollback artefact retained:
+- Topic artefact: **ONNX INT8** (`artifacts/topic_classifier_int8`, dynamic quantisation via `optimum`'s `ORTQuantizer` + `AutoQuantizationConfig.avx2`). Measured 4x smaller on disk than the ONNX fp32 export (266 MB vs 1.06 GB).
+- NER artefact: **ONNX INT8** (`artifacts/ner_int8`), same quantisation config.
+- Latency evidence: fp32 torch @512 padded -> fp32 torch @128 dynamic alone was a 14.8x/9.5x (p50/p99) win from preprocessing/batching discipline; ONNX + INT8 rungs measured on top of that in `BENCHMARKS.md` Lab 7 table.
+- Paired quality-tax evidence: **0.0000 [0.0000, 0.0000]** for both the classifier (macro-F1, paired bootstrap) and NER (sentence-exact-match, paired bootstrap) — fp32, ONNX fp32, and ONNX INT8 all score identically (1.0000) on their respective validation/test sets. This is consistent with every other Lab 3/4 ceiling effect in this project (the synthetic task is easy enough that quantisation noise doesn't move the needle), so the decision to quantise both models is an easy call here — on a harder, real-world task this same paired-bootstrap methodology might show a real, nonzero tax that would need weighing against the latency win.
+- Rollback artefact retained: yes — `artifacts/topic_classifier` (fp32) and `artifacts/ner` (fp32) are kept on disk and loaded by `canaries.py` at startup specifically to catch a broken/corrupted quantised export before it serves traffic (compares the INT8 prediction against the fp32 prediction on a pinned canary input).
 
 ## architecture
 - Encoder/decoder rationale by task:
