@@ -23,7 +23,7 @@
 | Lab 3 — Topic Classification, NER, Extractive QA | ✅ Complete |
 | Lab 4 — Arabic Pipeline & Dialect-Aware Fine-tuning | ✅ Complete |
 | Lab 5 — Bilingual Semantic Search | ✅ Complete |
-| Lab 6 — Evaluation Report | ⬜ Not started |
+| Lab 6 — Evaluation Report | ✅ Complete |
 | Lab 7 — Optimisation & Serving | ⬜ Not started |
 | Capstone | ⬜ Not started |
 
@@ -163,6 +163,15 @@ Built a two-stage search service over 20,000 historical cases: a bi-encoder (`pa
 - Investigated a suspiciously low recall@10 (~0.07) rather than assuming the target was unreachable: the supplied "relevant" case IDs turned out to be a mechanical same-topic sample spaced exactly 8 apart (a corpus-generation artifact), not genuine relevance judgements — confirmed by inspecting actual query/answer text pairs. Added `topic_precision@10` as a fairer diagnostic: **1.0000** — every single top-10 result for every query was correctly on-topic, proving the retrieval mechanism itself works even though the labelled-ID recall metric doesn't fairly measure it here.
 - Full reasoning and a manual qualitative cross-lingual retrieval check are in `NOTES.md`.
 
+### Lab 6 — Evaluation Report
+
+Built bootstrap confidence intervals (`bootstrap_ci`, `paired_bootstrap_diff`), a sliced-accuracy report with small-slice flagging, a behavioural test runner (invariance/directional), and an automated evaluation-report + model-card generator (3 model cards in `docs/model_cards/`, known-limitations sections written by hand per the lab's requirement).
+
+- Sliced the 2,400-row validation fixture and found a single, complete blind spot: every Arabic `parks` case is misclassified as `roads` (0/300 correct) while every other slice scores a perfect 1.0000 — investigated instead of just reporting the aggregate 87.5% accuracy.
+- Re-ran the actual Lab 3A XLM-R classifier on those exact same 300 rows: **1.0000** — the blind spot lives in the reference prediction fixture, not in the model this project trained. Confirmed statistically with a paired bootstrap (delta +12.5 points, 95% CI entirely positive) and documented as a new error-taxonomy category (`docs/ERROR_TAXONOMY.md` #9) rather than assumed away.
+- Behavioural suite (adapted to use the real topic classifier, since no sentiment model exists in this project — see `NOTES.md`): invariance 60.0%, directional 80.0%, both below the course's reference targets — a genuine, unresolved robustness gap reported honestly rather than hidden behind the strong aggregate accuracy.
+- Full write-up in `EVALUATION_REPORT.md`.
+
 ---
 
 ## 🧭 Evidence Files
@@ -170,3 +179,5 @@ Built a two-stage search service over 20,000 historical cases: a bi-encoder (`pa
 - **`NOTES.md`** — observations, defect analysis, and findings from every lab.
 - **`BENCHMARKS.md`** — numbers from actual runs, never copied reference values.
 - **`DECISIONS.md`** — model/tokenizer/architecture choices backed by measured evidence.
+- **`EVALUATION_REPORT.md`** — the Lab 6 honest quality report: sliced metrics, behavioural rates, error taxonomy, known limitations.
+- **`docs/model_cards/`** — per-model cards (intended use, metrics, known limitations).
