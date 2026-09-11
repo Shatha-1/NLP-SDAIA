@@ -98,14 +98,19 @@ Measured via `python notebooks/05_retrieval_eval.py` on the full 20,000-case FAI
 **Manual qualitative check** (200-case index, `دفعت الفاتورة` and pothole-style queries): with rerank, an Arabic pothole query correctly retrieved cross-lingual matches including an English "road maintenance" case, and a nonsense/off-topic query (`"كيف الطقس اليوم"`) correctly returned an empty result. The mechanism works as intended; the labelled-ID benchmark just isn't a fair yardstick for it on this fixture.
 
 ## Lab 6 — Evaluation
-| Model | Aggregate macro-F1 [CI] | Gulf [CI] | Invariance pass | MFT pass |
-|---|---|---|---:|---:|
-| topic classifier | | | | |
-| dialect-aware | | | | |
+Measured via `python scripts/evaluation_report.py` on `data/eval/validation_predictions.csv` (2,400 rows) plus a live re-inference pass with the actual Lab 3A XLM-R classifier.
 
-- paired comparison verdict:
-- error taxonomy top categories:
-- top-3 prioritised fixes:
+| Model | Aggregate accuracy [CI] | Arabic-parks slice | Invariance pass | Directional pass |
+|---|---|---:|---:|---:|
+| reference fixture (`validation_predictions.csv`) | 0.8750 [0.8617, 0.8888] | 0.0000 | n/a | n/a |
+| our XLM-R classifier (re-inferred, same rows) | 1.0000 (parks slice only) | 1.0000 | 0.6000 | 0.8000 |
+
+(Gulf slice: not computable — this fixture's `dialect_region` column only has `MSA`/`NA`, 0 Gulf rows. Full-corpus aggregate accuracy for our re-inferred classifier wasn't separately computed since the paired comparison below is the more informative number.)
+
+- **Paired comparison verdict**: our XLM-R classifier vs the fixture's reference predictions — delta = **+0.1250** [+0.1113, +0.1383] (95% CI entirely positive → our model is significantly better on this set, driven entirely by the parks slice below).
+- **Error taxonomy top categories**: 300/300 errors (100%) = new category "Arabic parks↔roads lexical confound" (`docs/ERROR_TAXONOMY.md` #9). Single-category population — see `EVALUATION_REPORT.md` for the full read-through.
+- **Top-3 prioritised fixes**: (1) add Arabic `parks` training data not co-located with road vocabulary — predicted delta up to +12.5 accuracy points if the gap is real rather than fixture-specific; (2) add per-`(lang, topic)` slice regression checks to the eval pipeline so a single-slice collapse can't ship unnoticed; (3) verify what model actually produced `validation_predictions.csv` before treating it as current production evidence, since the shipped classifier does not reproduce this failure.
+- **Behavioural targets** (course reference: invariance ≥95%, MFT/directional ≥90%): **not met** — invariance 60.0%, directional 80.0%, measured on the real classifier, reported honestly rather than adjusted.
 
 ## Lab 7 — Optimisation ladder
 | Rung | p50 | p99 | quality metric / paired Δ | Artefact size |
