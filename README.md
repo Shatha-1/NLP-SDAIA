@@ -24,7 +24,7 @@
 | Lab 4 — Arabic Pipeline & Dialect-Aware Fine-tuning | ✅ Complete |
 | Lab 5 — Bilingual Semantic Search | ✅ Complete |
 | Lab 6 — Evaluation Report | ✅ Complete |
-| Lab 7 — Optimisation & Serving | ⬜ Not started |
+| Lab 7 — Optimisation & Serving | ✅ Complete |
 | Capstone | ⬜ Not started |
 
 Full measured evidence lives in [`BENCHMARKS.md`](BENCHMARKS.md), engineering notes and findings in [`NOTES.md`](NOTES.md), and evidence-backed decisions in [`DECISIONS.md`](DECISIONS.md).
@@ -171,6 +171,16 @@ Built bootstrap confidence intervals (`bootstrap_ci`, `paired_bootstrap_diff`), 
 - Re-ran the actual Lab 3A XLM-R classifier on those exact same 300 rows: **1.0000** — the blind spot lives in the reference prediction fixture, not in the model this project trained. Confirmed statistically with a paired bootstrap (delta +12.5 points, 95% CI entirely positive) and documented as a new error-taxonomy category (`docs/ERROR_TAXONOMY.md` #9) rather than assumed away.
 - Behavioural suite (adapted to use the real topic classifier, since no sentiment model exists in this project — see `NOTES.md`): invariance 60.0%, directional 80.0%, both below the course's reference targets — a genuine, unresolved robustness gap reported honestly rather than hidden behind the strong aggregate accuracy.
 - Full write-up in `EVALUATION_REPORT.md`.
+
+### Lab 7 — Optimisation & Serving
+
+Built the benchmark ladder (fp32 torch → ONNX fp32 → ONNX INT8), a FastAPI service with startup canaries, and a load test.
+
+- **38.6x p50 / 28.1x p99 speed-up** from fp32 torch @512-padded (302ms/351ms) to ONNX INT8 @128 (7.83ms/12.51ms), with **zero measured quality tax** on both the topic classifier and NER (paired bootstrap, macro-F1/entity-F1 unchanged) — INT8 ships for both models, fp32 kept as the rollback artefact.
+- Caught a noisy single-run result before trusting it: an n=200 benchmark showed INT8 with a *worse* p99 than fp32-ONNX; re-running at n=500 with more warm-up showed this was sampling noise (INT8 is actually best on both p50 and p99).
+- **HTTP load test never meets the 40ms p99 target** (16 concurrent, 60s): started at 113.94ms with no thread pinning, cut to 63.41ms by pinning `OMP_NUM_THREADS`/ONNX `intra_op_num_threads=4`, and got *worse* (132.26ms) trying `intra_op_num_threads=1`. Concluded this is a genuine single-machine CPU concurrency limit for a 270M-parameter model, not something more thread-tuning fixes — reported the real number rather than only showing the single-request latency that does meet target.
+- `hey` wasn't available in this environment (no Go toolchain either); wrote `scripts/load_test.py`, a `ThreadPoolExecutor`-based equivalent with the same fixed-concurrency/fixed-duration spec, rather than downloading an untrusted prebuilt binary.
+- Startup canaries (`canaries.py`) compare the serving (INT8) artefact's prediction against the fp32 rollback on a pinned input, failing fast if a quantised export is corrupted; `/health` reports canary status.
 
 ---
 
