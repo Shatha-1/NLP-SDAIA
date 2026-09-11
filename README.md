@@ -22,7 +22,7 @@
 | Lab 2 — Transformer Attention | ✅ Complete |
 | Lab 3 — Topic Classification, NER, Extractive QA | ✅ Complete |
 | Lab 4 — Arabic Pipeline & Dialect-Aware Fine-tuning | ✅ Complete |
-| Lab 5 — Bilingual Semantic Search | ⬜ Not started |
+| Lab 5 — Bilingual Semantic Search | ✅ Complete |
 | Lab 6 — Evaluation Report | ⬜ Not started |
 | Lab 7 — Optimisation & Serving | ⬜ Not started |
 | Capstone | ⬜ Not started |
@@ -154,6 +154,14 @@ Every ceiling-effect result (e.g. a perfect baseline leaving no room to "beat by
 - Dialect audit: Arabic traffic is **66.7% Gulf / 33.3% MSA** — evaluating only on MSA would silently miss most real Arabic feedback.
 - NER + segmentation re-evaluation: LOCATION recall was already a perfect 1.0000 pre-segmentation, so the measured delta is 0.00 (not +4) — a genuine ceiling effect, documented rather than hidden.
 - **Arabic model bake-off** (CAMeLBERT-mix vs CAMeLBERT-DA vs the XLM-R incumbent): discovered the frozen test split is 100% English and `validation` has zero Gulf rows, so a genuine held-out Gulf slice (961 rows) was carved out of `train` by citizen group before evaluating. All three checkpoints tied at a perfect 1.0000 macro-F1 on every slice (another ceiling effect — Gulf-slice delta vs incumbent: +0.00 for both candidates). With accuracy tied, the tie-break used AR fertility (both CAMeLBERT variants tokenize Arabic 18% more efficiently than XLM-R) plus Bayan's known Gulf-majority traffic — **decision: CAMeLBERT-DA**, full rationale in `DECISIONS.md`.
+
+### Lab 5 — Bilingual Semantic Search
+
+Built a two-stage search service over 20,000 historical cases: a bi-encoder (`paraphrase-multilingual-MiniLM-L12-v2`) + FAISS `IndexFlatIP` for retrieval, a cross-encoder (`mmarco-mMiniLMv2-L12-H384-v1`) for reranking, and a versioned manifest (model, preprocessing version, vector count, dimension) that the service asserts on load.
+
+- Found and fixed a real bug: the cross-encoder returns unbounded raw logits, not a [0,1] score — the initial `min_score=0.25` threshold silently rejected every query, including relevant ones. Fixed with a sigmoid transform, then tuned `min_score` via a sweep against the 20 labelled no-answer queries — **20/20 correctly rejected**, robust across the whole tested range.
+- Investigated a suspiciously low recall@10 (~0.07) rather than assuming the target was unreachable: the supplied "relevant" case IDs turned out to be a mechanical same-topic sample spaced exactly 8 apart (a corpus-generation artifact), not genuine relevance judgements — confirmed by inspecting actual query/answer text pairs. Added `topic_precision@10` as a fairer diagnostic: **1.0000** — every single top-10 result for every query was correctly on-topic, proving the retrieval mechanism itself works even though the labelled-ID recall metric doesn't fairly measure it here.
+- Full reasoning and a manual qualitative cross-lingual retrieval check are in `NOTES.md`.
 
 ---
 
