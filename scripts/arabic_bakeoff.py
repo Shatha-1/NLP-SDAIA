@@ -6,8 +6,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
+import pandas as pd
 import torch
 from sklearn.metrics import f1_score
+from sklearn.model_selection import GroupShuffleSplit
 from torch.utils.data import DataLoader, Dataset
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
@@ -111,16 +113,43 @@ def main():
     label_names = sorted(ds["train"]["topic"].unique())
     label2id = {label: i for i, label in enumerate(label_names)}
 
-    ar_train = ds["train"][ds["train"]["lang"] == "ar"]
-    # The frozen test split is 100% English (0 Arabic rows) in this dataset --
-    # verified: ds["test"]["lang"].value_counts() == {"en": 1200}. Validation
-    # is balanced (1200 ar / 1200 en) and unused for any tuning decision here,
-    # so it's the only split that can actually answer an all/Gulf/MSA question.
-    ar_test = ds["validation"][ds["validation"]["lang"] == "ar"]
+    ar_train_full = ds["train"][ds["train"]["lang"] == "ar"]
+    ar_val = ds["validation"][ds["validation"]["lang"] == "ar"]
+    # Two real data-splitting problems, verified directly (see NOTES.md):
+    #   1. The frozen test split is 100% English (0 Arabic rows) -- unusable here.
+    #   2. ALL 4,800 Gulf-dialect rows live in `train`; `validation`'s 1,200 Arabic
+    #      rows are 100% MSA (0 Gulf). So there is no pre-existing held-out Gulf
+    #      data anywhere in the supplied split.
+    # Fix: carve a held-out Gulf slice out of train ourselves (grouped by
+    # citizen_group_id so no citizen leaks between the carved eval set and the
+    # remaining training data), and train the CAMeLBERT candidates on what's left.
+    gulf_train_full = ar_train_full[ar_train_full["dialect_region"] == "Gulf"]
+    msa_train = ar_train_full[ar_train_full["dialect_region"] != "Gulf"]
+
+    splitter = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
+    keep_idx, holdout_idx = next(
+        splitter.split(gulf_train_full, groups=gulf_train_full["citizen_group_id"])
+    )
+    gulf_holdout = gulf_train_full.iloc[holdout_idx]
+    gulf_train_remainder = gulf_train_full.iloc[keep_idx]
+
+    ar_train = pd.concat([msa_train, gulf_train_remainder], ignore_index=True)
+    ar_test = pd.concat([ar_val, gulf_holdout], ignore_index=True)
+    print(
+        f"Data note: carved {len(gulf_holdout)} Gulf rows out of train as a held-out "
+        f"eval slice (citizen-grouped, 20%); {len(gulf_train_remainder)} Gulf rows remain "
+        f"for training. Eval set: {len(ar_test)} rows ({len(ar_val)} MSA from validation + "
+        f"{len(gulf_holdout)} held-out Gulf)."
+    )
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     results = {}
 
+    print(
+        "Caveat: the XLM-R incumbent was already fine-tuned on ALL Gulf rows in Lab 3A "
+        "(including the ones held out here), so its Gulf score below is in-sample/optimistic, "
+        "not a fair held-out comparison against the freshly-trained candidates."
+    )
     incumbent_tok = AutoTokenizer.from_pretrained(args.incumbent_dir)
     incumbent_model = AutoModelForSequenceClassification.from_pretrained(args.incumbent_dir).to(device)
     results["multilingual incumbent (XLM-R)"] = _evaluate(
