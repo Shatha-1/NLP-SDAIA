@@ -81,14 +81,21 @@ Measured via `python scripts/arabic_bakeoff.py` on a Colab T4 GPU. Eval set: 2,1
 **Gulf-slice delta vs incumbent: CAMeLBERT-mix +0.00, CAMeLBERT-DA +0.00** macro-F1 points — not the target +4. Same ceiling effect as every other Lab 3/4 classification result on this synthetic corpus: topic vocabulary is trivial enough that all three checkpoints saturate at a perfect 1.0000 regardless of dialect or pretraining. The measurable, non-tied signal here is **AR fertility**: both CAMeLBERT variants tokenize Arabic more efficiently (1.305) than the multilingual XLM-R incumbent (1.589), i.e. shorter, cheaper sequences for the same text — see `DECISIONS.md#arabic-model` for how that (plus Bayan's known dialect mix) breaks the tie between CAMeLBERT-mix and CAMeLBERT-DA.
 
 ## Lab 5 — Search
-| Configuration | recall@10 | MRR@10 | p50 latency/query |
-|---|---:|---:|---:|
-| bi-encoder only | | | |
-| + cross-encoder rerank | | | |
-| cross-lingual slice | | | |
+Measured via `python notebooks/05_retrieval_eval.py` on the full 20,000-case FAISS index (`sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` bi-encoder + `cross-encoder/mmarco-mMiniLMv2-L12-H384-v1` reranker) against the 150 labelled queries (130 answerable + 20 no-answer), `k=10`, `candidates=50`.
 
-- no-answer empty-correct: ___ / 20
-- cross-lingual gap: ___
+| Configuration | recall@10 (labelled ID) | recall@10 (lenient, text-dup) | topic_precision@10 | MRR@10 | p50 latency/query |
+|---|---:|---:|---:|---:|---:|
+| bi-encoder only | 0.0692 | 0.0769 | **1.0000** | 0.0651 | 11.7 ms |
+| + cross-encoder rerank | 0.0077 | 0.0692 | **1.0000** | 0.0193 | 222.5 ms |
+
+- no-answer empty-correct: **20 / 20** (min_score = 0.10; a full sweep over 0.02–0.25 gave identical recall and 100% no-answer accuracy at every value tested — the score gap between answerable and no-answer queries is wide, so the exact threshold isn't a knife-edge choice here)
+- cross-lingual recall@10 gap (EN − AR, lenient, with rerank): **−0.0262** (AR slightly higher, both very low for the reason below)
+
+**Why recall@10 against the labelled IDs is so low (and why that's not a retrieval failure):** inspected the actual labels — e.g. query Q-001 ("حفرة في الطريق أمام حي العليا منذ 16 أيام") lists `relevant_case_ids` `[CASE-000001, CASE-000009, CASE-000017]`, whose case texts are about damaged asphalt near Jeddah, a road near Al Yasmin, and a road near An Narjis — none textually or situationally close to the query beyond sharing the `roads` topic. Checked the pattern across queries: every query's 3 "relevant" ids are the same topic, spaced by **exactly 8** (Q-001: 1/9/17, Q-002: 10/18/26, Q-003: 19/27/35, ...) — a mechanical, round-robin artifact of how the 8-topic corpus was generated, not a genuine semantic relevance judgement. A content-based retrieval system has no way to preferentially recover an arbitrary same-topic sample like that. The `topic_precision@10 = 1.0000` result (every single one of the top-10 results, for every one of the 130 answerable queries, shares the query's exact topic) is the fairer measure of retrieval quality here, and it's perfect. The corpus is also heavily duplicated (20,000 rows, 5,401 unique `case_text` values, some templates repeated 300+ times), which is why a "lenient" recall counting any textual duplicate of a labelled id as a hit is reported alongside the strict one — it's still low, for the same structural reason.
+
+**Rerank appears to hurt the labelled-ID recall** (0.0692 → 0.0077 strict) while `topic_precision@10` stays perfect either way — expected, not a regression: since the labelled ids are an arbitrary sample within the correct topic, reordering an already-topically-perfect candidate pool by cross-encoder relevance has no reason to preserve that specific arbitrary sample any better than raw bi-encoder similarity order does. No conclusion about rerank quality can be drawn from the labelled-ID metric here; a manual qualitative check (below) is more informative.
+
+**Manual qualitative check** (200-case index, `دفعت الفاتورة` and pothole-style queries): with rerank, an Arabic pothole query correctly retrieved cross-lingual matches including an English "road maintenance" case, and a nonsense/off-topic query (`"كيف الطقس اليوم"`) correctly returned an empty result. The mechanism works as intended; the labelled-ID benchmark just isn't a fair yardstick for it on this fixture.
 
 ## Lab 6 — Evaluation
 | Model | Aggregate macro-F1 [CI] | Gulf [CI] | Invariance pass | MFT pass |

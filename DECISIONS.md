@@ -15,9 +15,9 @@
 - Segmentation contract: clitic segmentation (`segment()`, CAMeL Tools D3 scheme) is evaluated independently in the NER path (see Lab 4 LOCATION recall note in `BENCHMARKS.md`) — it is not wired into this classification bake-off, since none of the topic-classification training/eval text here goes through `segment()`.
 
 ## search-min-score
-- Threshold:
-- No-answer evidence:
-- False-positive / false-negative trade-off:
+- Threshold: **0.10**, applied to the cross-encoder score *after* a sigmoid transform (the raw `cross-encoder/mmarco-mMiniLMv2-L12-H384-v1` output is an unbounded logit, not a [0,1] similarity — measured range on this domain: roughly -7.8 to +6.6; even genuinely relevant short-text pairs often only reach ~0.10-0.20 after sigmoid, so this is not a conventional "0.5-ish similarity" cutoff).
+- No-answer evidence: swept `min_score` over {0.02, 0.05, 0.10, 0.15, 0.20, 0.25} against all 150 labelled queries (20 of them genuinely unanswerable). All 20 no-answer queries were correctly rejected (empty result) at every threshold in that range, and answerable-query recall was identical at every threshold too — i.e. there's a wide, clean score gap between "on-topic case found" and "nothing relevant," so 0.10 is a robust middle-of-the-range choice, not a fragile knife-edge pick.
+- False-positive / false-negative trade-off: because the sweep showed no trade-off inside the tested range (no threshold there caused an on-topic answer to be wrongly suppressed, nor a no-answer query to be wrongly served), the practical choice was to pick a value with headroom on both sides (0.10, roughly midway between the observed no-answer-query scores and the observed answerable-query scores) rather than sit right at either boundary of the tested range.
 
 ## quantisation-split
 - Topic artefact:
