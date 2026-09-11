@@ -21,7 +21,7 @@
 | Lab 1 — Bilingual Preprocessing & Tokenisation | ✅ Complete |
 | Lab 2 — Transformer Attention | ✅ Complete |
 | Lab 3 — Topic Classification, NER, Extractive QA | ✅ Complete |
-| Lab 4 — Arabic Pipeline & Dialect-Aware Fine-tuning | 🚧 In progress |
+| Lab 4 — Arabic Pipeline & Dialect-Aware Fine-tuning | ✅ Complete |
 | Lab 5 — Bilingual Semantic Search | ⬜ Not started |
 | Lab 6 — Evaluation Report | ⬜ Not started |
 | Lab 7 — Optimisation & Serving | ⬜ Not started |
@@ -147,13 +147,13 @@ Implemented scaled dot-product attention and multi-head attention in raw PyTorch
 
 Every ceiling-effect result (e.g. a perfect baseline leaving no room to "beat by +0.08") is measured and explained in `BENCHMARKS.md`, not smoothed over.
 
-### Lab 4 — Arabic Pipeline (in progress)
+### Lab 4 — Arabic Pipeline & Dialect-Aware Fine-tuning
 
 - `normalize_arabic()`: hamza normalisation, teh marbuta → heh, alef maksura → yeh, tatweel removal, optional dediacritisation — **30/30** golden pairs pass.
 - `segment()`: CAMeL Tools MLE-disambiguator clitic segmentation (D3 scheme), with a fallback for colloquial words the morphology database can't analyse.
 - Dialect audit: Arabic traffic is **66.7% Gulf / 33.3% MSA** — evaluating only on MSA would silently miss most real Arabic feedback.
 - NER + segmentation re-evaluation: LOCATION recall was already a perfect 1.0000 pre-segmentation, so the measured delta is 0.00 (not +4) — a genuine ceiling effect, documented rather than hidden.
-- Arabic model bake-off (CAMeLBERT-mix vs CAMeLBERT-DA vs the XLM-R incumbent, sliced by Gulf/MSA) — in progress.
+- **Arabic model bake-off** (CAMeLBERT-mix vs CAMeLBERT-DA vs the XLM-R incumbent): discovered the frozen test split is 100% English and `validation` has zero Gulf rows, so a genuine held-out Gulf slice (961 rows) was carved out of `train` by citizen group before evaluating. All three checkpoints tied at a perfect 1.0000 macro-F1 on every slice (another ceiling effect — Gulf-slice delta vs incumbent: +0.00 for both candidates). With accuracy tied, the tie-break used AR fertility (both CAMeLBERT variants tokenize Arabic 18% more efficiently than XLM-R) plus Bayan's known Gulf-majority traffic — **decision: CAMeLBERT-DA**, full rationale in `DECISIONS.md`.
 
 ---
 
