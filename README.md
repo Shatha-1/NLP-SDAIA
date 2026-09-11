@@ -25,7 +25,7 @@
 | Lab 5 — Bilingual Semantic Search | ✅ Complete |
 | Lab 6 — Evaluation Report | ✅ Complete |
 | Lab 7 — Optimisation & Serving | ✅ Complete |
-| Capstone | ⬜ Not started |
+| Capstone | ✅ Complete |
 
 Full measured evidence lives in [`BENCHMARKS.md`](BENCHMARKS.md), engineering notes and findings in [`NOTES.md`](NOTES.md), and evidence-backed decisions in [`DECISIONS.md`](DECISIONS.md).
 
@@ -181,6 +181,14 @@ Built the benchmark ladder (fp32 torch → ONNX fp32 → ONNX INT8), a FastAPI s
 - **HTTP load test never meets the 40ms p99 target** (16 concurrent, 60s): started at 113.94ms with no thread pinning, cut to 63.41ms by pinning `OMP_NUM_THREADS`/ONNX `intra_op_num_threads=4`, and got *worse* (132.26ms) trying `intra_op_num_threads=1`. Concluded this is a genuine single-machine CPU concurrency limit for a 270M-parameter model, not something more thread-tuning fixes — reported the real number rather than only showing the single-request latency that does meet target.
 - `hey` wasn't available in this environment (no Go toolchain either); wrote `scripts/load_test.py`, a `ThreadPoolExecutor`-based equivalent with the same fixed-concurrency/fixed-duration spec, rather than downloading an untrusted prebuilt binary.
 - Startup canaries (`canaries.py`) compare the serving (INT8) artefact's prediction against the fp32 rollback on a pinned input, failing fast if a quantised export is corrupted; `/health` reports canary status.
+
+### Capstone — Assembling Bayan
+
+Wired the remaining endpoints on top of the Lab 7 service: `POST /v1/entities` (NER), `POST /v1/search` (Lab 5 two-stage search), `POST /v1/analyse` (classification + entities + similar cases in one call), plus a chosen extension, `POST /v1/classify:batch`. Full test suite: **78/78 passing**.
+
+- Live-tested every endpoint against the running service (not just the pytest contract) with real bilingual text — classification and search performed excellently; NER on a sentence phrased differently from its narrow training templates missed part of a location span, which is exactly the "unvalidated on novel phrasing" limitation already written by hand into the NER model card — now empirically demonstrated rather than just hypothesised.
+- Caught a testing artefact while doing this: Windows console encoding mangled Arabic text passed as an inline `curl -d "..."` argument, briefly looking like a server bug (missing entities, empty search results) until isolated to the test harness, not the API, by calling the code directly in Python and by switching to a UTF-8 file payload.
+- `docs/CAPSTONE_CHECKLIST.md` is filled in honestly: several course-reference targets (classifier beating an already-perfect TF-IDF baseline, retrieval recall@10 against a mechanically-sampled label set, HTTP p99 ≤40ms on a single CPU) are marked **not met** with the measured evidence and root-cause explanation, rather than adjusted to look passing — consistent with every other ceiling-effect and data-quirk finding across this project.
 
 ---
 
